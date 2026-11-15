@@ -67,7 +67,7 @@ function inline(s, inLink = false) {
           const def = refs.get(label.replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, '$1').normalize('NFKC').toLowerCase().replace(/[\u00df]/g, 'ss').replace(/[ \t\n]+/g, ' '));
           if (def) { dest = def.href; title = def.title; }
         }
-        if (dest !== null) { const body = image ? plain(labelText) : inline(labelText, true); const href = url(dest, true); let alt = image ? inline(labelText).replace(/<img\b[^>]*alt="([^"]*)"[^>]*>/g, '$1').replace(/<[^>]*>/g, '') : ''; out += image ? `<img src="${href}" alt="${alt}"${title ? ` title="${plain(title)}"` : ''}>` : `<a href="${href}"${title ? ` title="${plain(title)}"` : ''}>${body}</a>`; i = after; continue; }
+        if (dest !== null && !(labelText.lastIndexOf('<') > labelText.lastIndexOf('>'))) { const body = image ? plain(labelText) : inline(labelText, true); const href = url(dest, true); let alt = image ? inline(labelText).replace(/<img\b[^>]*alt="([^"]*)"[^>]*>/g, '$1').replace(/<[^>]*>/g, '') : ''; out += image ? `<img src="${href}" alt="${alt}"${title ? ` title="${plain(title)}"` : ''}>` : `<a href="${href}"${title ? ` title="${plain(title)}"` : ''}>${body}</a>`; i = after; continue; }
       }
     }
     if (c === '&') {
