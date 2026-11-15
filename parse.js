@@ -39,7 +39,7 @@ function inline(s, inLink = false) {
       let n = 1; while (s[i + n] === '`') n++;
       const mark = '`'.repeat(n); let end = i + n, found = -1;
       while ((end = s.indexOf(mark, end)) >= 0) { let run = end + n; while (s[run] === '`') run++; if (run - end === n) { found = end; break; } end = run; }
-      if (found >= 0) { let value = s.slice(i + n, found).replace(/\n/g, ' '); if (/^ .* $/.test(value) && /[^ ]/.test(value)) value = value.slice(1, -1); out += '<code>' + plain(value) + '</code>'; i = found + n; continue; }
+      if (found >= 0) { let value = s.slice(i + n, found).replace(/\n/g, ' '); if (/^ .* $/.test(value) && /[^ ]/.test(value)) value = value.slice(1, -1); out += '<code>' + esc(value) + '</code>'; i = found + n; continue; }
     }
     if (c === '<') {
       const end = s.indexOf('>', i + 1);
