@@ -240,7 +240,7 @@ function parseBlocks(markdown, root = false) {
         if (task) item[0] = item[0].slice(task[0].length);
         const html = parseBlocks(item.join('\n'));
         let content = html;
-        if (!item._loose && !loose && /^<p>[\s\S]*?<\/p>\n?$/.test(content)) content = content.replace(/^<p>/, '').replace(/<\/p>\n?$/, '');
+        if (!item._loose && !loose) content = content.replace(/^<p>([\s\S]*?)<\/p>\n/, '$1');
         const checkbox = task ? `<input${task[1] === ' ' ? '' : ' checked=""'} disabled="" type="checkbox"> ` : '';
         const blockContent = content.replace(/\n$/, '');
         const closesBlock = /<\/(?:blockquote|ul|ol|pre|table|div|h[1-6])>$/i.test(blockContent);
