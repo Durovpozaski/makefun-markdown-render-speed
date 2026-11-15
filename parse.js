@@ -261,7 +261,9 @@ function parseBlocks(markdown, root = false) {
         if (hs[0] === 'blank' && i < lines.length && blank(lines[i])) break;
       }
       if (i < lines.length && hs[0] !== 'type7' && endRe && endRe.test(block.join('\n'))) { /* consumed through matching line */ }
-      out.push(block.join('\n') + (hs[0] === 'comment' && endRe && endRe.test(block.join('\n')) ? '' : '\n')); continue;
+      const nextBlock = lines.slice(i).find(x => !blank(x));
+      const joinsParagraph = (hs[0] === 'blank' || hs[0] === 'type7') && nextBlock && !htmlStart(nextBlock) && !heading(nextBlock) && !fence(nextBlock) && !listMatch(nextBlock) && !/^ {0,3}>/.test(nextBlock) && !hr(nextBlock);
+      out.push(block.join('\n') + (hs[0] === 'comment' && endRe && endRe.test(block.join('\n')) || joinsParagraph ? '' : '\n')); continue;
     }
     if (/^ {4}\S/.test(line) || /^\t/.test(line)) {
       const code = []; while (i < lines.length && (/^(?: {4}|\t)/.test(lines[i]) || blank(lines[i]))) { code.push(lines[i].replace(/^(?: {4}|\t)/, '')); i++; }
