@@ -48,7 +48,7 @@ function inline(s, inLink = false) {
         if (/^[A-Za-z][A-Za-z0-9.+-]{1,31}:[^ <>]*$/.test(v)) { out += `<a href="${url(v)}">${plain(v)}</a>`; i = end + 1; continue; }
         if (mail) { out += `<a href="mailto:${url(v)}">${plain(v)}</a>`; i = end + 1; continue; }
     if (/^\/?(?:title|textarea|style|xmp|iframe|noembed|noframes|script|plaintext)(?:\s|\/?>)/i.test(v)) { out += '&lt;' + s.slice(i + 1, end) + '&gt;'; i = end + 1; continue; }
-        if (!v.includes('\\') && (/^\/?[A-Za-z][A-Za-z0-9-]*(?:\s|\/?>)/.test(v) || /^!--/.test(v) || /^\?[\s\S]*\?$/.test(v))) { out += s.slice(i, end + 1); i = end + 1; continue; }
+        if (!v.includes('\\') && (/^\/?[A-Za-z][A-Za-z0-9-]*(?:\s|\/?>|$)/.test(v) || /^!--/.test(v) || /^\?[\s\S]*\?$/.test(v))) { out += s.slice(i, end + 1); i = end + 1; continue; }
       }
     }
     if ((!inLink && c === '[') || (c === '!' && s[i + 1] === '[')) {
@@ -75,9 +75,17 @@ function inline(s, inLink = false) {
         if (m) { out += m[0][1] === '#' ? esc(decodeEntity(m[0])) : m[0]; i += m[0].length; continue; }
       out += '&amp;'; i++; continue;
     }
-    if (c === 'w' && /^www\.[A-Za-z0-9][^\s<>]*/i.test(s.slice(i))) {
-      const m = /^www\.[A-Za-z0-9][^\s<>]*/i.exec(s.slice(i)); let v = m[0].replace(/[.,:;!?*_~]+$/, '');
-      if (v.length > 4 && /\.[A-Za-z]{2,}(?:\/|$)/.test(v)) { out += `<a href="http://${url(v)}">${plain(v)}</a>`; i += v.length; continue; }
+    if ((c === 'w' && /^www\.[A-Za-z0-9][^\s<>]*/i.test(s.slice(i))) || (/[A-Za-z]/.test(c) && /^(?:https?:\/\/|ftp:\/\/)/i.test(s.slice(i)))) {
+      const m = /^(?:www\.[A-Za-z0-9]|https?:\/\/[A-Za-z0-9]|ftp:\/\/[A-Za-z0-9])[^\s<>]*/i.exec(s.slice(i));
+      if (m) {
+        let v = m[0].replace(/[.,:;!?*_~]+$/, '');
+        while (v.endsWith(')') && (v.match(/\)/g)||[]).length > (v.match(/\(/g)||[]).length) v = v.slice(0,-1);
+        if (/^(?:www\.)?[A-Za-z0-9][^\s]*\.[A-Za-z]{2,}(?:\/|$)/i.test(v)) { const href = /^www\./i.test(v) ? 'http://' + v : v; out += `<a href="${url(href)}">${plain(v)}</a>`; i += v.length; continue; }
+      }
+    }
+    if (c === '@' || /[A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]/.test(c)) {
+      const m = /^[A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+/.exec(s.slice(i));
+      if (m && (i === 0 || /[\s(]/.test(s[i-1]))) { const v = m[0]; out += `<a href="mailto:${url(v)}">${plain(v)}</a>`; i += v.length; continue; }
     }
     if (c === '*' || c === '_') {
       let n = 1; while (s[i + n] === c) n++; const run = n;
@@ -151,8 +159,8 @@ function parseBlocks(markdown, root = false) {
     if (/^<\?/.test(t)) return ['pi'];
     if (/^<![A-Z]/.test(s)) return ['decl'];
     if (/^<!\[cdata\[/i.test(t)) return ['cdata'];
+    if (/^<\/?[A-Za-z][A-Za-z0-9-]*(?:\s|\/?>)/.test(t) && (t.match(/</g)||[]).length <= 1) return ['type7'];
     if (/^<\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|meta|nav|noframes|ol|optgroup|option|p|param|section|source|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)(?:\s|\/?>)/.test(tl)) return ['blank'];
-    if (/^<\/?[A-Za-z][A-Za-z0-9-]*(?:\s|\/?>)/.test(t)) return ['type7'];
     return null;
   };
   const isInterrupt = (s, paragraph = false) => {
