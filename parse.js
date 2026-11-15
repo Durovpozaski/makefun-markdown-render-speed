@@ -59,7 +59,7 @@ function inline(s, inLink = false) {
         if (s[j] === '(') {
           j++; while (s[j] === ' ' || s[j] === '\n' || s[j] === '\t') j++;
         if (s[j] === '<') { const z = s.indexOf('>', j + 1); if (z >= 0 && !/[\n\\]/.test(s.slice(j + 1, z))) { dest = s.slice(j + 1, z); j = z + 1; } }
-          else { const ds = j; let par = 0; while (j < s.length && !/[\s)]/.test(s[j])) { if (s[j] === '\\') j++; else if (s[j] === '(') par++; else if (s[j] === ')') { if (!par) break; par--; } j++; } if (par === 0) dest = s.slice(ds, j); }
+          else { const ds = j; let par = 0; while (j < s.length && !/\s/.test(s[j])) { if (s[j] === '\\') j++; else if (s[j] === '(') par++; else if (s[j] === ')') { if (!par) break; par--; } j++; } if (par === 0) dest = s.slice(ds, j); }
           if (dest !== null) { while (s[j] === ' ' || s[j] === '\n' || s[j] === '\t') j++; if (s[j] === '"' || s[j] === "'" || s[j] === '(') { const q = s[j] === '(' ? ')' : s[j]; const z = s.indexOf(q, j + 1); if (z >= 0) { title = s.slice(j + 1, z); j = z + 1; while (s[j] === ' ' || s[j] === '\n' || s[j] === '\t') j++; } } if (s[j] === ')') { after = j + 1; } else dest = null; }
         } else {
           let label = labelText;
