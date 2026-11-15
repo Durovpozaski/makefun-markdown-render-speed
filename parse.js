@@ -48,7 +48,7 @@ function inline(s, inLink = false) {
         if (/^[A-Za-z][A-Za-z0-9.+-]{1,31}:[^ <>]*$/.test(v)) { out += `<a href="${url(v)}">${plain(v)}</a>`; i = end + 1; continue; }
         if (mail) { out += `<a href="mailto:${url(v)}">${plain(v)}</a>`; i = end + 1; continue; }
     if (/^\/?(?:title|textarea|style|xmp|iframe|noembed|noframes|script|plaintext)(?:\s|\/?>)/i.test(v)) { out += '&lt;' + s.slice(i + 1, end) + '&gt;'; i = end + 1; continue; }
-        if (/^\/?[A-Za-z][^>]*$/.test(v) || /^!--/.test(v) || /^\?[\s\S]*\?$/.test(v)) { out += s.slice(i, end + 1); i = end + 1; continue; }
+        if (!v.includes('\\') && (/^\/?[A-Za-z][A-Za-z0-9-]*(?:\s|\/?>)/.test(v) || /^!--/.test(v) || /^\?[\s\S]*\?$/.test(v))) { out += s.slice(i, end + 1); i = end + 1; continue; }
       }
     }
     if ((!inLink && c === '[') || (c === '!' && s[i + 1] === '[')) {
@@ -59,8 +59,8 @@ function inline(s, inLink = false) {
         if (s[j] === '(') {
           j++; while (s[j] === ' ' || s[j] === '\n' || s[j] === '\t') j++;
         if (s[j] === '<') { const z = s.indexOf('>', j + 1); if (z >= 0 && !/[\n\\]/.test(s.slice(j + 1, z))) { dest = s.slice(j + 1, z); j = z + 1; } }
-          else { const ds = j; let par = 0; while (j < s.length && !/\s/.test(s[j])) { if (s[j] === '\\') j++; else if (s[j] === '(') par++; else if (s[j] === ')') { if (!par) break; par--; } j++; } if (par === 0) dest = s.slice(ds, j); }
-          if (dest !== null) { while (s[j] === ' ' || s[j] === '\n' || s[j] === '\t') j++; if (s[j] === '"' || s[j] === "'" || s[j] === '(') { const q = s[j] === '(' ? ')' : s[j]; const z = s.indexOf(q, j + 1); if (z >= 0) { title = s.slice(j + 1, z); j = z + 1; while (s[j] === ' ' || s[j] === '\n' || s[j] === '\t') j++; } } if (s[j] === ')') { after = j + 1; } else dest = null; }
+          else { const ds = j; let par = 0; while (j < s.length && !/[ \t\n]/.test(s[j])) { if (s[j] === '\\') j++; else if (s[j] === '(') par++; else if (s[j] === ')') { if (!par) break; par--; } j++; } if (par === 0) dest = s.slice(ds, j); }
+          if (dest !== null) { while (s[j] === ' ' || s[j] === '\n' || s[j] === '\t') j++; if (s[j] === '"' || s[j] === "'" || s[j] === '(') { const q = s[j] === '(' ? ')' : s[j]; let z = j + 1; while (z < s.length) { if (s[z] === '\\') { z += 2; continue; } if (s[z] === q) break; z++; } if (z < s.length) { title = s.slice(j + 1, z).replace(/\\([!\"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, '$1'); j = z + 1; while (s[j] === ' ' || s[j] === '\n' || s[j] === '\t') j++; } } if (s[j] === ')') { after = j + 1; } else dest = null; }
         } else {
           let label = labelText;
           if (s[j] === '[') { const z = s.indexOf(']', j + 1); if (z >= 0) { if (z > j + 1) label = s.slice(j + 1, z); after = z + 1; } }
@@ -94,7 +94,7 @@ function inline(s, inLink = false) {
       out += c; i++; continue;
     }
     if (c === '~') { let run = 1; while (s[i + run] === '~') run++; if (run <= 2) { const mark = '~'.repeat(run); let e = i + run; while ((e = s.indexOf(mark, e)) >= 0) { let tail = e + run; while (s[tail] === '~') tail++; if (tail - e === run && e > i + run && !/[\s\u00a0]/.test(s[e - 1]) && !/[\s\u00a0]/.test(s[i + run])) { out += '<del>' + inline(s.slice(i + run, e), inLink) + '</del>'; i = tail; break; } e = tail; } if (i >= s.length || s[i] !== '~') continue; } }
-    out += c === '>' ? '&gt;' : c === '"' ? '&quot;' : c; i++;
+    out += c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '"' ? '&quot;' : c; i++;
   }
   return out;
 }
