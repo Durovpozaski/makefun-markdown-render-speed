@@ -241,7 +241,8 @@ function parseBlocks(markdown, root = false) {
         if (!item._loose && !loose && /^<p>[\s\S]*?<\/p>\n?$/.test(content)) content = content.replace(/^<p>/, '').replace(/<\/p>\n?$/, '');
         const checkbox = task ? `<input${task[1] === ' ' ? '' : ' checked=""'} disabled="" type="checkbox"> ` : '';
         const blockContent = content.replace(/\n$/, '');
-        out.push('<li>' + checkbox + blockContent + ((item._loose || loose) && blockContent ? '\n' : '') + '</li>\n');
+        const closesBlock = /<\/(?:blockquote|ul|ol|pre|table|div|h[1-6])>$/i.test(blockContent);
+        out.push('<li>' + checkbox + blockContent + (((item._loose || loose) || closesBlock) && blockContent ? '\n' : '') + '</li>\n');
       }
       out.push(`</${tag}>\n`); continue;
     }
