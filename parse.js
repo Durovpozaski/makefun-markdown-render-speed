@@ -25,7 +25,7 @@ function decodeForUrl(s) {
 function url(s, markdownEscapes = false) {
   const decoded = markdownEscapes ? s.replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, '$1') : s;
   const escaped = decoded.replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, (_m, c) => '%5C' + c);
-  return esc(encodeURI(escaped).replace(/%25([\da-f]{2})/gi, '%$1')).replace(/&amp;([A-Za-z][A-Za-z\d]{0,31};)/g, '&$1');
+  return esc(encodeURI(escaped).replace(/%25/gi, '%')).replace(/&amp;([A-Za-z][A-Za-z\d]{0,31};)/g, '&$1');
 }
 function inline(s, inLink = false) {
   let out = '', i = 0;
