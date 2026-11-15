@@ -154,7 +154,7 @@ function parseBlocks(markdown, root = false) {
   const htmlStart = (s) => {
     if (!/^ {0,3}</.test(s)) return null;
     const t = s.slice(s.indexOf('<')); const tl = t.toLowerCase();
-    if (/^<(script|pre|style)(?:\s|>|\/)/i.test(t)) return ['tag', RegExp.$1];
+    if (/^<(script|pre|style|textarea|title|xmp|iframe|noembed|noframes|plaintext)(?:\s|>|\/|$)/i.test(t)) return ['tag', RegExp.$1];
     if (/^<!--/.test(t)) return ['comment'];
     if (/^<\?/.test(t)) return ['pi'];
     if (/^<![A-Z]/.test(s)) return ['decl'];
