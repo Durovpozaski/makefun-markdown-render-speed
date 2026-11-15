@@ -48,6 +48,7 @@ function inline(s, inLink = false) {
         const v = s.slice(i + 1, end), mail = /^[A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/.test(v);
         if (/^[A-Za-z][A-Za-z0-9.+-]{1,31}:[^ <>]*$/.test(v)) { out += `<a href="${url(v)}">${plain(v)}</a>`; i = end + 1; continue; }
         if (mail) { out += `<a href="mailto:${url(v)}">${plain(v)}</a>`; i = end + 1; continue; }
+    if (/^\/?(?:title|textarea|style|xmp|iframe|noembed|noframes|script|plaintext)(?:\s|\/?>)/i.test(v)) { out += '&lt;' + s.slice(i + 1, end) + '&gt;'; i = end + 1; continue; }
         if (/^\/?[A-Za-z][^>]*$/.test(v) || /^!--/.test(v) || /^\?[\s\S]*\?$/.test(v)) { out += s.slice(i, end + 1); i = end + 1; continue; }
       }
     }
@@ -139,39 +140,139 @@ function collectDefinitions(lines) {
 function parseBlocks(markdown, root = false) {
   if (root) refs.clear();
   let src = String(markdown).replace(/\r\n?/g, '\n').replace(/\0/g, '\uFFFD');
-  const lines = root ? collectDefinitions(src.split('\n')) : src.split('\n'), out = [];
+  let lines = root ? collectDefinitions(src.split('\n')) : src.split('\n');
+  const out = [];
+  const listMatch = (s) => /^( {0,3})([*+-]|(\d{1,9})([.)]))(?:([ \t]+)(.*)|[ \t]*)$/.exec(s);
+  const indent = (s) => (s.match(/^ */) || [''])[0].length;
+  const hr = (s) => /^ {0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$/.test(s);
+  const htmlStart = (s) => {
+    if (!/^ {0,3}</.test(s)) return null;
+    const t = s.slice(s.indexOf('<')).toLowerCase();
+    if (/^<(script|pre|style)(?:\s|>|\/)/.test(t)) return ['tag', RegExp.$1];
+    if (/^<!--/.test(t)) return ['comment'];
+    if (/^<\?/.test(t)) return ['pi'];
+    if (/^<![A-Z]/.test(s)) return ['decl'];
+    if (/^<!\[cdata\[/i.test(t)) return ['cdata'];
+    if (/^<\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|meta|nav|noframes|ol|optgroup|option|p|param|section|source|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)(?:\s|\/?>)/.test(t)) return ['blank'];
+    if (/^<\/?[A-Za-z][A-Za-z0-9-]*(?:\s|\/?>)/.test(s)) return ['type7'];
+    return null;
+  };
+  const isInterrupt = (s, paragraph = false) => {
+    if (heading(s) || fence(s) || /^ {0,3}>/.test(s) || hr(s) || htmlStart(s)) return true;
+    const lm = listMatch(s);
+    return !!lm && (!paragraph || !lm[3] || Number(lm[3]) === 1);
+  };
   for (let i = 0; i < lines.length;) {
     const line = lines[i];
     if (blank(line)) { i++; continue; }
     const f = fence(line);
-    if (f) {
-      const body = []; i++;
-      while (i < lines.length && !new RegExp('^ {0,3}' + f[2][0] + '{' + f[2].length + ',}[ \\t]*$').test(lines[i])) body.push(lines[i++]);
+    if (f && (f[2][0] !== '`' || !f[3].includes('`'))) {
+      const body = []; const ch = f[2][0], size = f[2].length; i++;
+      while (i < lines.length && !new RegExp('^ {0,3}' + (ch === '`' ? '`' : '~') + '{' + size + ',}[ \\t]*$').test(lines[i])) body.push(lines[i++]);
       if (i < lines.length) i++;
       const info = f[3].trim().split(/[ \t]/)[0];
       out.push('<pre><code' + (info ? ` class="language-${esc(info)}"` : '') + '>' + esc(body.join('\n')) + '\n</code></pre>\n'); continue;
     }
     const h = heading(line);
     if (h) { const text = h[3].replace(/[ \t]+#+[ \t]*$/, '').trim(); out.push(`<h${h[2].length}>${inline(text)}</h${h[2].length}>\n`); i++; continue; }
-    if (/^ {0,3}(?:-{3,}|\*{3,}|_{3,})[ \t]*$/.test(line)) { out.push('<hr>\n'); i++; continue; }
+    if (hr(line)) { out.push('<hr>\n'); i++; continue; }
     if (/^ {0,3}>/.test(line)) {
-      const q = []; while (i < lines.length && /^ {0,3}> ?/.test(lines[i])) q.push(lines[i++].replace(/^ {0,3}> ?/, ''));
-      out.push('<blockquote>\n' + parseBlocks(q.join('\n')) + '</blockquote>\n'); continue;
+      const quote = []; let blanks = 0;
+      while (i < lines.length) {
+        const m = /^( {0,3})>(?: ?)(.*)$/.exec(lines[i]);
+        if (m) { quote.push(m[2]); i++; blanks = 0; continue; }
+        if (blank(lines[i])) { quote.push(''); i++; blanks++; if (blanks === 2) break; continue; }
+        if (blanks || /^ {0,3}(?:#{1,6}(?:\s|$)|(?:`{3,}|~{3,}))/.test(lines[i])) break;
+        if (isInterrupt(lines[i], false) && !listMatch(lines[i])) break;
+        quote.push(lines[i++]);
+      }
+      out.push('<blockquote>\n' + parseBlocks(quote.join('\n')) + '</blockquote>\n'); continue;
     }
-    const li = list(line);
-    if (li) {
-      const ordered = /^\d/.test(li[2]), tag = ordered ? 'ol' : 'ul', start = ordered && Number.parseInt(li[2], 10) !== 1 ? ` start="${Number.parseInt(li[2],10)}"` : '';
-      out.push(`<${tag}${start}>\n`);
-      while (i < lines.length) { const item = list(lines[i]); if (!item || item[1].length !== li[1].length || (/^\d/.test(item[2]) !== ordered)) break; let body = item[3] || ''; const task = /^\[([ xX])\][ \t]+/.exec(body); if (task) body = body.slice(task[0].length); i++; while (i < lines.length && /^ {2,}\S/.test(lines[i])) body += '\n' + lines[i++].trim(); out.push('<li>' + (task ? `<input${task[1] === ' ' ? '' : ' checked=""'} disabled="" type="checkbox"> ` : '') + inline(body) + '</li>\n'); }
+    const lm = listMatch(line);
+    if (lm) {
+      const marker = lm[2], ordered = !!lm[3], delim = lm[4] || '', tag = ordered ? 'ol' : 'ul';
+      const startNum = ordered ? Number(lm[3]) : 1;
+      const startAttr = ordered && startNum !== 1 ? ` start="${startNum}"` : '';
+      const baseIndent = lm[1].length;
+      out.push(`<${tag}${startAttr}>\n`);
+      let loose = false, items = [];
+      while (i < lines.length) {
+        const first = listMatch(lines[i]);
+        if (!first || first[1].length !== baseIndent || (!!first[3] !== ordered) || (!ordered && first[2] !== marker) || (ordered && first[4] !== delim)) break;
+        let body = [first[6] || ''];
+        const markerWidth = first[2].length;
+        const spaces = first[5] ? first[5].length : 1;
+        const contentIndent = baseIndent + markerWidth + (spaces > 4 ? 1 : spaces);
+        i++;
+        let blankBefore = false;
+        while (i < lines.length) {
+          if (blank(lines[i])) {
+            let j = i; while (j < lines.length && blank(lines[j])) j++;
+            const next = j < lines.length ? listMatch(lines[j]) : null;
+            if (next && next[1].length === baseIndent && (!!next[3] === ordered) && (!ordered ? next[2] === marker : next[4] === delim)) { body.push(''); i = j; break; }
+            if (j < lines.length && indent(lines[j]) >= contentIndent) { if (body.length && !blank(body[body.length - 1])) loose = true; body.push(''); i++; continue; }
+            i = j; break;
+          }
+          const next = listMatch(lines[i]);
+          if (next && next[1].length === baseIndent) break;
+          const leading = indent(lines[i]);
+          if (leading >= contentIndent) { body.push(lines[i].slice(Math.min(contentIndent, leading))); i++; continue; }
+          if (isInterrupt(lines[i], false)) break;
+          body.push(lines[i++]);
+        }
+        items.push(body);
+      }
+      for (const item of items) {
+        while (item.length && blank(item[0])) item.shift();
+        while (item.length && blank(item[item.length - 1])) item.pop();
+        const task = /^\[([ xX])\][ \t]+/.exec(item[0] || '');
+        if (task) item[0] = item[0].slice(task[0].length);
+        const html = parseBlocks(item.join('\n'));
+        let content = html;
+        if (!loose && /^<p>[\s\S]*?<\/p>\n?$/.test(content)) content = content.replace(/^<p>/, '').replace(/<\/p>\n?$/, '');
+        const checkbox = task ? `<input${task[1] === ' ' ? '' : ' checked=""'} disabled="" type="checkbox"> ` : '';
+        const blockContent = content.replace(/\n$/, '');
+        out.push('<li>' + checkbox + blockContent + (loose && blockContent ? '\n' : '') + '</li>\n');
+      }
       out.push(`</${tag}>\n`); continue;
     }
-    if (/^ {4}\S/.test(line)) {
-      const body = []; while (i < lines.length && (/^ {4}/.test(lines[i]) || blank(lines[i]))) body.push(lines[i++].replace(/^ {4}/, '')); out.push('<pre><code>' + esc(body.join('\n').replace(/\n+$/, '')) + '\n</code></pre>\n'); continue;
+    const hs = htmlStart(line);
+    if (hs) {
+      const block = [line]; i++;
+      const endRe = hs[0] === 'tag' ? new RegExp('</' + hs[1] + '\\s*>', 'i') : hs[0] === 'comment' ? /-->/ : hs[0] === 'pi' ? /\?>/ : hs[0] === 'cdata' ? /\]\]>/ : null;
+      while (i < lines.length) {
+        const previous = block.join('\n');
+        if (endRe && endRe.test(previous)) break;
+        if (hs[0] === 'blank' && blank(lines[i])) break;
+        if (hs[0] === 'type7' && blank(lines[i])) break;
+        block.push(lines[i++]);
+        if (hs[0] === 'blank' && i < lines.length && blank(lines[i])) break;
+      }
+      if (i < lines.length && hs[0] !== 'type7' && endRe && endRe.test(block.join('\n'))) { /* consumed through matching line */ }
+      out.push(block.join('\n') + (hs[0] === 'comment' && endRe && endRe.test(block.join('\n')) ? '' : '\n')); continue;
     }
-    if (/^<(?:!--|\/?(?:address|article|aside|base|blockquote|body|caption|center|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|nav|ol|optgroup|option|p|script|section|style|summary|table|tbody|td|tfoot|th|thead|title|tr|ul)(?:\s|>|\/))/i.test(line)) { const html = []; while (i < lines.length && !blank(lines[i])) html.push(lines[i++]); out.push(html.join('\n') + '\n'); continue; }
+    if (/^ {4}\S/.test(line) || /^\t/.test(line)) {
+      const code = []; while (i < lines.length && (/^(?: {4}|\t)/.test(lines[i]) || blank(lines[i]))) { code.push(lines[i].replace(/^(?: {4}|\t)/, '')); i++; }
+      while (code.length && blank(code[code.length - 1])) code.pop();
+      out.push('<pre><code>' + esc(code.join('\n')) + '\n</code></pre>\n'); continue;
+    }
+    if (i + 1 < lines.length && line.includes('|') && /^ {0,3}\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)+\|?[ \t]*$/.test(lines[i + 1])) {
+      const split = (s) => { let a = [], cell = '', escp = false; for (let k = 0; k < s.length; k++) { const c = s[k]; if (c === '|' && !escp) { a.push(cell.trim()); cell = ''; } else { cell += c; if (c === '\\' && !escp) escp = true; else escp = false; } } a.push(cell.trim()); if (a[0] === '') a.shift(); if (a[a.length - 1] === '') a.pop(); return a; };
+      const heads = split(line), aligns = split(lines[i + 1]).map(x => x[0] === ':' && x.endsWith(':') ? 'center' : x[0] === ':' ? 'left' : x.endsWith(':') ? 'right' : '');
+      const cellHtml = (v) => inline(v.replace(/\\\|/g, '|').replace(/\\\\/g, '\\').trim());
+      out.push('<table>\n<thead>\n<tr>\n'); for (let k = 0; k < aligns.length; k++) out.push(`<th${aligns[k] ? ` align="${aligns[k]}"` : ''}>${cellHtml(heads[k] || '')}</th>\n`); out.push('</tr>\n</thead>\n');
+      i += 2; const width = aligns.length;
+      while (i < lines.length && !blank(lines[i]) && lines[i].includes('|')) { const cells = split(lines[i]); out.push('<tbody>');
+        // Rows are accumulated below to keep tbody as a single section.
+        const rows = [];
+        while (i < lines.length && !blank(lines[i]) && lines[i].includes('|')) { const values = split(lines[i]); rows.push('<tr>\n' + Array.from({length: width}, (_,k) => `<td${aligns[k] ? ` align="${aligns[k]}"` : ''}>${cellHtml(values[k] || '')}</td>\n`).join('') + '</tr>'); i++; }
+        out.push(rows.join('\n') + '</tbody>'); break;
+      }
+      out.push('</table>\n'); continue;
+    }
     const para = [line]; i++;
-    while (i < lines.length && !blank(lines[i]) && !heading(lines[i]) && !fence(lines[i]) && !list(lines[i]) && !/^ {0,3}>/.test(lines[i]) && !/^ {0,3}(?:-{3,}|\*{3,}|_{3,})[ \t]*$/.test(lines[i])) para.push(lines[i++]);
-    if (i < lines.length && /^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[i])) { const n = /^\s*=/.test(lines[i]) ? 1 : 2; out.push(`<h${n}>${inline(para.join('\n'))}</h${n}>\n`); i++; continue; }
+    while (i < lines.length && !blank(lines[i]) && !isInterrupt(lines[i], true) && !/^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[i])) para.push(lines[i++]);
+    if (i < lines.length && /^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[i])) { const n = /^ *===/.test(lines[i]) ? 1 : 2; out.push(`<h${n}>${inline(para.join('\n').trim())}</h${n}>\n`); i++; continue; }
     out.push('<p>' + inline(para.join('\n')) + '</p>\n');
   }
   return out.join('');
