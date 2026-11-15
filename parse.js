@@ -177,6 +177,8 @@ function parseBlocks(markdown, root = false) {
       while (i < lines.length && !new RegExp('^ {0,3}' + (ch === '`' ? '`' : '~') + '{' + size + ',}[ \\t]*$').test(lines[i])) body.push(lines[i++]);
       if (i < lines.length) i++;
       while (body.length && blank(body[body.length - 1])) body.pop();
+      const fenceIndent = f[1].length;
+      for (let k = 0; k < body.length; k++) body[k] = body[k].replace(new RegExp('^ {0,' + fenceIndent + '}'), '');
       const info = f[3].trim().split(/[ \t]/)[0];
       const code = body.join('\n');
       out.push('<pre><code' + (info ? ` class="language-${esc(info)}"` : '') + '>' + esc(code) + (code ? '\n' : '') + '</code></pre>\n'); continue;
@@ -282,7 +284,7 @@ function parseBlocks(markdown, root = false) {
     }
     const para = [line]; i++;
     while (i < lines.length && !blank(lines[i]) && !isInterrupt(lines[i], true) && !/^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[i])) para.push(lines[i++]);
-    if (i < lines.length && /^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[i])) { const n = /^ *===/.test(lines[i]) ? 1 : 2; out.push(`<h${n}>${inline(para.join('\n').trim())}</h${n}>\n`); i++; continue; }
+    if (i < lines.length && /^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[i])) { const n = /^ *-/.test(lines[i]) ? 2 : 1; out.push(`<h${n}>${inline(para.join('\n').trim())}</h${n}>\n`); i++; continue; }
     out.push('<p>' + inline(para.join('\n')) + '</p>\n');
   }
   return out.join('');
