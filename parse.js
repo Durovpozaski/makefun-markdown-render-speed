@@ -219,12 +219,12 @@ function parseBlocks(markdown, root = false) {
           if (blank(lines[i])) {
             let j = i; while (j < lines.length && blank(lines[j])) j++;
             const next = j < lines.length ? listMatch(lines[j]) : null;
-            if (next && next[1].length <= baseIndent + 1 && (!!next[3] === ordered) && (!ordered ? next[2] === marker : next[4] === delim)) { body.push(''); loose = true; i = j; break; }
+            if (next && next[1].length <= baseIndent && (!!next[3] === ordered) && (!ordered ? next[2] === marker : next[4] === delim)) { body.push(''); loose = true; i = j; break; }
             if (j < lines.length && indent(lines[j]) >= contentIndent) { if (body.length && !blank(body[body.length - 1])) loose = true; body.push(''); i++; continue; }
             i = j; break;
           }
           const next = listMatch(lines[i]);
-          if (next && next[1].length <= baseIndent + 3) break;
+          if (next && next[1].length <= baseIndent) break;
           const leading = indent(lines[i]);
           if (leading >= contentIndent) { body.push(lines[i].slice(Math.min(contentIndent, leading))); i++; continue; }
           if (isInterrupt(lines[i], false)) break;
