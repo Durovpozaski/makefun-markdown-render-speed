@@ -87,8 +87,8 @@ function inline(s, inLink = false) {
       if (c === '_' && /[\p{L}\p{N}]/u.test(a) && /[\p{L}\p{N}]/u.test(b)) { out += c.repeat(n); i += n; continue; }
       const close = c === '*' ? right : right && !left;
       if (left) {
-        let found = -1, k = i + n;
-        while (k < s.length) { if (s[k] === '\\') { k += 2; continue; } if (s[k] === c) { let m = 1; while (s[k + m] === c) m++; const x = k === 0 ? '\n' : s[k - 1], y = k + m === s.length ? '\n' : s[k + m]; const cl = !/[\s\u00a0]/.test(x) && (!unicodePunctuation.test(x) || /[\s\u00a0]/.test(y) || unicodePunctuation.test(y)); if (cl && (c !== '_' || !/[\p{L}\p{N}]/u.test(y))) { found = k; break; } k += m; } else k++; }
+        let found = -1, k = i + n, nested = 0;
+        while (k < s.length) { if (s[k] === '\\') { k += 2; continue; } if (s[k] === c) { let m = 1; while (s[k + m] === c) m++; const x = k === 0 ? '\n' : s[k - 1], y = k + m === s.length ? '\n' : s[k + m]; const cl = !/[\s\u00a0]/.test(x) && (!unicodePunctuation.test(x) || /[\s\u00a0]/.test(y) || unicodePunctuation.test(y)); const op = !/[\s\u00a0]/.test(y) && (!unicodePunctuation.test(y) || /[\s\u00a0]/.test(x) || unicodePunctuation.test(x)); if (op && m === 1) nested++; if (cl && (c !== '_' || !/[\p{L}\p{N}]/u.test(y))) { if (nested) nested--; else { found = k; break; } } k += m; } else k++; }
         if (found > i + n) { const end = found; const m = (() => { let q = 1; while (s[end + q] === c) q++; return q; })(); const use = Math.min(run, m) >= 3 ? 3 : Math.min(run, m) >= 2 ? 2 : 1; const inner = inline(s.slice(i + use, end), inLink); out += use === 3 ? `<em><strong>${inner}</strong></em>` : use === 2 ? `<strong>${inner}</strong>` : `<em>${inner}</em>`; i = end + use; continue; }
       }
       out += c; i++; continue;
@@ -158,7 +158,7 @@ function parseBlocks(markdown, root = false) {
   const isInterrupt = (s, paragraph = false) => {
     if (heading(s) || fence(s) || /^ {0,3}>/.test(s) || hr(s) || htmlStart(s)) return true;
     const lm = listMatch(s);
-    return !!lm && (!paragraph || !lm[3] || Number(lm[3]) === 1);
+    return !!lm && (!paragraph || (!!lm[6] && !blank(lm[6]) && (!lm[3] || Number(lm[3]) === 1))); 
   };
   for (let i = 0; i < lines.length;) {
     const line = lines[i];
