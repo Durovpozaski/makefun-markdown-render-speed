@@ -88,12 +88,12 @@ function inline(s, inLink = false) {
       const close = c === '*' ? right : right && !left;
       if (left) {
         let found = -1, k = i + n, nested = 0;
-        while (k < s.length) { if (s[k] === '\\') { k += 2; continue; } if (s[k] === c) { let m = 1; while (s[k + m] === c) m++; const x = k === 0 ? '\n' : s[k - 1], y = k + m === s.length ? '\n' : s[k + m]; const cl = !/[\s\u00a0]/.test(x) && (!unicodePunctuation.test(x) || /[\s\u00a0]/.test(y) || unicodePunctuation.test(y)); const op = !/[\s\u00a0]/.test(y) && (!unicodePunctuation.test(y) || /[\s\u00a0]/.test(x) || unicodePunctuation.test(x)); if (op && m === 1) nested++; if (cl && (c !== '_' || !/[\p{L}\p{N}]/u.test(y))) { if (nested) nested--; else { found = k; break; } } k += m; } else k++; }
-        if (found > i + n) { const end = found; const m = (() => { let q = 1; while (s[end + q] === c) q++; return q; })(); const use = Math.min(run, m) >= 3 ? 3 : Math.min(run, m) >= 2 ? 2 : 1; const inner = inline(s.slice(i + use, end), inLink); out += use === 3 ? `<em><strong>${inner}</strong></em>` : use === 2 ? `<strong>${inner}</strong>` : `<em>${inner}</em>`; i = end + use; continue; }
+        while (k < s.length) { if (s[k] === '\\') { k += 2; continue; } if (s[k] === c) { let m = 1; while (s[k + m] === c) m++; const x = k === 0 ? '\n' : s[k - 1], y = k + m === s.length ? '\n' : s[k + m]; const cl = !/[\s\u00a0]/.test(x) && (!unicodePunctuation.test(x) || /[\s\u00a0]/.test(y) || unicodePunctuation.test(y)); const op = !/[\s\u00a0]/.test(y) && (!unicodePunctuation.test(y) || /[\s\u00a0]/.test(x) || unicodePunctuation.test(x)); if (op && (m === 1 || (c === '_' && m === 2))) nested++; if (cl && (c !== '_' || !/[\p{L}\p{N}]/u.test(y))) { if (nested) nested--; else if (run >= 3 ? m >= 3 : true) { found = k; break; } } k += m; } else k++; }
+        if (found > i + n) { const end = found; const m = (() => { let q = 1; while (s[end + q] === c) q++; return q; })(); const use = Math.min(run, m) >= 3 ? 3 : Math.min(run, m) >= 2 ? 2 : 1; const shared = c === '*' && run === 2 && m >= 3; const inner = inline(s.slice(i + use, end) + (shared ? '*' : ''), inLink); out += use === 3 ? `<em><strong>${inner}</strong></em>` : use === 2 ? `<strong>${inner}</strong>` : `<em>${inner}</em>`; i = end + use + (shared ? 1 : 0); continue; }
       }
       out += c; i++; continue;
     }
-    if (c === '~' && s[i + 1] === '~') { const e = s.indexOf('~~', i + 2); if (e > i + 2) { out += '<del>' + inline(s.slice(i + 2, e), inLink) + '</del>'; i = e + 2; continue; } }
+    if (c === '~') { let run = 1; while (s[i + run] === '~') run++; if (run <= 2) { const mark = '~'.repeat(run); let e = i + run; while ((e = s.indexOf(mark, e)) >= 0) { let tail = e + run; while (s[tail] === '~') tail++; if (tail - e === run && e > i + run && !/[\s\u00a0]/.test(s[e - 1]) && !/[\s\u00a0]/.test(s[i + run])) { out += '<del>' + inline(s.slice(i + run, e), inLink) + '</del>'; i = tail; break; } e = tail; } if (i >= s.length || s[i] !== '~') continue; } }
     out += c === '>' ? '&gt;' : c === '"' ? '&quot;' : c; i++;
   }
   return out;
