@@ -64,7 +64,7 @@ function inline(s, inLink = false) {
         } else {
           let label = labelText;
           if (s[j] === '[') { const z = s.indexOf(']', j + 1); if (z >= 0) { if (z > j + 1) label = s.slice(j + 1, z); after = z + 1; } }
-          const def = refs.get(label.replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, '$1').normalize('NFKC').toLowerCase().replace(/[ \t\n]+/g, ' '));
+          const def = refs.get(label.replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, '$1').normalize('NFKC').toLowerCase().replace(/[\u00df]/g, 'ss').replace(/[ \t\n]+/g, ' '));
           if (def) { dest = def.href; title = def.title; }
         }
         if (dest !== null) { const body = image ? plain(labelText) : inline(labelText, true); const href = url(dest, true); let alt = image ? inline(labelText).replace(/<img\b[^>]*alt="([^"]*)"[^>]*>/g, '$1').replace(/<[^>]*>/g, '') : ''; out += image ? `<img src="${href}" alt="${alt}"${title ? ` title="${plain(title)}"` : ''}>` : `<a href="${href}"${title ? ` title="${plain(title)}"` : ''}>${body}</a>`; i = after; continue; }
@@ -130,7 +130,7 @@ function collectDefinitions(lines) {
     }
     let titleRemainder = '';
     if (tail && (tail[0] === '"' || tail[0] === "'" || tail[0] === '(')) { const close = tail[0] === '(' ? ')' : tail[0]; const e = tail.lastIndexOf(close); if (e > 0) { title = tail.slice(1, e).replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, '$1'); titleRemainder = tail.slice(e + 1).trim(); } }
-    if (valid && (!tail || !/^['"(]/.test(tail) || (!!title && !titleRemainder))) { const key = m[1].replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, '$1').normalize('NFKC').toLowerCase().replace(/[ \t\n]+/g, ' '); if (!refs.has(key)) refs.set(key, { href: dest, title }); if (quote) kept.push(quote[1].trimEnd()); i = j - 1; }
+    if (valid && (!tail || !/^['"(]/.test(tail) || (!!title && !titleRemainder))) { const key = m[1].replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, '$1').normalize('NFKC').toLowerCase().replace(/[\u00df]/g, 'ss').replace(/[ \t\n]+/g, ' '); if (!refs.has(key)) refs.set(key, { href: dest, title }); if (quote) kept.push(quote[1].trimEnd()); i = j - 1; }
     else kept.push(line);
   }
   return kept;
@@ -168,8 +168,10 @@ function parseBlocks(markdown, root = false) {
       const body = []; const ch = f[2][0], size = f[2].length; i++;
       while (i < lines.length && !new RegExp('^ {0,3}' + (ch === '`' ? '`' : '~') + '{' + size + ',}[ \\t]*$').test(lines[i])) body.push(lines[i++]);
       if (i < lines.length) i++;
+      while (body.length && blank(body[body.length - 1])) body.pop();
       const info = f[3].trim().split(/[ \t]/)[0];
-      out.push('<pre><code' + (info ? ` class="language-${esc(info)}"` : '') + '>' + esc(body.join('\n')) + '\n</code></pre>\n'); continue;
+      const code = body.join('\n');
+      out.push('<pre><code' + (info ? ` class="language-${esc(info)}"` : '') + '>' + esc(code) + (code ? '\n' : '') + '</code></pre>\n'); continue;
     }
     const h = heading(line);
     if (h) { const text = h[3].replace(/[ \t]+#+[ \t]*$/, '').trim(); out.push(`<h${h[2].length}>${inline(text)}</h${h[2].length}>\n`); i++; continue; }
@@ -196,7 +198,7 @@ function parseBlocks(markdown, root = false) {
       let loose = false, items = [];
       while (i < lines.length) {
         const first = listMatch(lines[i]);
-        if (!first || first[1].length !== baseIndent || (!!first[3] !== ordered) || (!ordered && first[2] !== marker) || (ordered && first[4] !== delim)) break;
+        if (!first || first[1].length > baseIndent + 3 || (!!first[3] !== ordered) || (!ordered && first[2] !== marker) || (ordered && first[4] !== delim)) break;
         let body = [first[6] || ''];
         const markerWidth = first[2].length;
         const spaces = first[5] ? first[5].length : 1;
@@ -212,7 +214,7 @@ function parseBlocks(markdown, root = false) {
             i = j; break;
           }
           const next = listMatch(lines[i]);
-          if (next && next[1].length <= baseIndent + 1) break;
+          if (next && next[1].length <= baseIndent + 3) break;
           const leading = indent(lines[i]);
           if (leading >= contentIndent) { body.push(lines[i].slice(Math.min(contentIndent, leading))); i++; continue; }
           if (isInterrupt(lines[i], false)) break;
