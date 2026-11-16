@@ -186,7 +186,7 @@ function parseBlocks(markdown, root = false) {
       while (body.length && blank(body[body.length - 1])) body.pop();
       const fenceIndent = f[1].length;
       for (let k = 0; k < body.length; k++) body[k] = body[k].replace(new RegExp('^ {0,' + fenceIndent + '}'), '');
-      const info = f[3].trim().split(/[ \t]/)[0];
+      const info = f[3].trim().split(/[ \t]/)[0].replace(/\\(.)/g, (m, c) => punctuation.test(c) ? c : m);
       const code = body.join('\n');
       out.push('<pre><code' + (info ? ` class="language-${esc(info)}"` : '') + '>' + esc(code) + (code ? '\n' : '') + '</code></pre>\n'); continue;
     }
