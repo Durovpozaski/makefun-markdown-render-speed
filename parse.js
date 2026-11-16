@@ -48,8 +48,8 @@ function inline(s, inLink = false) {
         const v = s.slice(i + 1, end), mail = /^[A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/.test(v);
         if (/^[A-Za-z][A-Za-z0-9.+-]{1,31}:[^ <>]*$/.test(v)) { out += `<a href="${url(v)}">${plain(v)}</a>`; i = end + 1; continue; }
         if (mail) { out += `<a href="mailto:${url(v)}">${plain(v)}</a>`; i = end + 1; continue; }
-        const tag = /^\/?[A-Za-z][A-Za-z0-9-]*(?:[ \t\n]+(?:[A-Za-z_:][A-Za-z0-9_.:-]*(?:[ \t\n]*=[ \t\n]*(?:[^\s\"'=<>`]+|'[^']*'|\"[^\"]*\"))?)?)*[ \t\n]*\/?$/.test(v);
-        const comment = /^!--[\s\S]*--$/.test(v), pi = /^\?[\s\S]*\?$/.test(v);
+        const tag = /^\/?[A-Za-z][A-Za-z0-9-]*(?:[ \t\n]+[A-Za-z_:][A-Za-z0-9_.:-]*(?:[ \t\n]*=[ \t\n]*(?:[^\s\"'=<>`]+|'[^']*'|\"[^\"]*\"))?)*[ \t\n]*\/?$/.test(v);
+        const comment = /^!--(?:[\s\S]*--|>|->)$/.test(v), pi = /^\?[\s\S]*\?$/.test(v);
         const decl = /^![A-Z][A-Z0-9-]*(?:[ \t\n]+[\s\S]*)?$/.test(v), cdata = /^!\[CDATA\[[\s\S]*\]\]$/.test(v);
         if (tag || comment || pi || decl || cdata) { out += s.slice(i, end + 1); i = end + 1; continue; }
       }
@@ -175,14 +175,15 @@ function parseBlocks(markdown, root = false) {
   const htmlStart = (s) => {
     if (!/^ {0,3}</.test(s)) return null;
     const t = s.slice(s.indexOf('<')); const tl = t.toLowerCase();
-    if ((t.match(/"/g) || []).length % 2 || (t.match(/'/g) || []).length % 2) return null;
+    const blockTag = /^<\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|meta|nav|noframes|ol|optgroup|option|p|param|section|source|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)(?:\s|\/?>)/.test(tl);
+    if (!blockTag && ((t.match(/"/g) || []).length % 2 || (t.match(/'/g) || []).length % 2)) return null;
     if (/^<(script|pre|style|textarea|title|xmp|iframe|noembed|noframes|plaintext)(?:\s|>|\/|$)/i.test(t)) return ['tag', RegExp.$1];
     if (/^<!--/.test(t)) return ['comment'];
     if (/^<\?/.test(t)) return ['pi'];
     if (/^<![A-Z]/.test(s)) return ['decl'];
     if (/^<!\[cdata\[/i.test(t)) return ['cdata'];
-    if (/^<\/?[A-Za-z][A-Za-z0-9-]*(?:\s|\/?>)/.test(t) && (t.match(/</g)||[]).length <= 1) return ['type7'];
     if (/^<\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|meta|nav|noframes|ol|optgroup|option|p|param|section|source|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)(?:\s|\/?>)/.test(tl)) return ['blank'];
+    if (/^<\/?[A-Za-z][A-Za-z0-9-]*(?:\s|\/?>)/.test(t) && (t.match(/</g)||[]).length <= 1) return ['type7'];
     return null;
   };
   const isInterrupt = (s, paragraph = false) => {
