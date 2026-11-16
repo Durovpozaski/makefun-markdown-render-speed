@@ -181,6 +181,9 @@ function parseBlocks(markdown, root = false) {
   if (root) refs.clear();
   let src = String(markdown).replace(/\r\n?/g, '\n').replace(/\0/g, '\uFFFD');
   let lines = root ? collectDefinitions(src.split('\n')) : src.split('\n');
+  const expandLeadFrom = (s, col, minusOne) => { let j = 0, c = col, ind = 0; while (j < s.length && (s[j] === ' ' || s[j] === '\t')) { if (s[j] === '\t') { const w = 4 - (c % 4); c += w; ind += (j === 0 && minusOne) ? w - 1 : w; } else { c++; ind++; } j++; } return j === 0 ? s : ' '.repeat(ind) + s.slice(j); };
+  const expandLead = (s) => expandLeadFrom(s, 0, false);
+  lines = lines.map(expandLead);
   const out = [];
   const listMatch = (s) => /^( {0,3})([*+-]|(\d{1,9})([.)]))(?:([ \t]+)(.*)|[ \t]*)$/.exec(s);
   const indent = (s) => (s.match(/^ */) || [''])[0].length;
@@ -226,7 +229,7 @@ function parseBlocks(markdown, root = false) {
       const quote = []; let blanks = 0, quotedBlank = false;
       while (i < lines.length) {
         const m = /^( {0,3})>(?: ?)(.*)$/.exec(lines[i]);
-        if (m) { if (blanks === 1) break; quote.push(m[2]); i++; blanks = 0; quotedBlank = !m[2]; continue; }
+        if (m) { if (blanks === 1) break; const consumed = lines[i][m[1].length + 1] === ' ' ? 1 : 0; quote.push(expandLeadFrom(m[2], m[1].length + 1 + consumed, !consumed && m[2][0] === '\t')); i++; blanks = 0; quotedBlank = !m[2]; continue; }
         if (blank(lines[i])) { quote.push(''); i++; blanks++; if (blanks === 2) break; continue; }
         if (blanks || quotedBlank || /^ {0,3}(?:#{1,6}(?:\s|$)|(?:`{3,}|~{3,}))/.test(lines[i])) break;
         if (isInterrupt(lines[i], false) && !listMatch(lines[i])) break;
@@ -247,8 +250,9 @@ function parseBlocks(markdown, root = false) {
         if (hr(lines[i]) || !first || first[1].length > baseIndent + 3 || (!!first[3] !== ordered) || (!ordered && first[2] !== marker) || (ordered && first[4] !== delim)) break;
         let body = [first[6] || ''];
         const markerWidth = first[2].length;
-        const spaces = first[5] ? first[5].length : 1;
+        let wcol = baseIndent + markerWidth, spaces = 0; for (const ch of (first[5] || ' ')) { if (ch === '\t') { const w = 4 - (wcol % 4); wcol += w; spaces += w; } else { wcol++; spaces++; } }
         const contentIndent = baseIndent + markerWidth + (spaces > 4 ? 1 : spaces);
+        if (first[6] && spaces > 4) body = [' '.repeat(spaces - 1) + first[6]];
         i++;
         let blankBefore = false;
         while (i < lines.length) {
