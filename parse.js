@@ -94,11 +94,11 @@ function inline(s, inLink = false) {
     }
     if (/[A-Za-z]/.test(c) && /^(?:mailto:|xmpp:)[^\s<>]+/i.test(s.slice(i))) {
       const m = /^(mailto:|xmpp:)([A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+(?:\/[^\s<>]*)?)/i.exec(s.slice(i));
-      if (m && !/[._-]/.test(m[2].slice(-1) + (s[i + m[0].length] || ''))) { const v=m[1]+m[2]; out += '<a href="' + url(v) + '">' + plain(v) + '</a>'; i += v.length; continue; }
+      if (m && !/[._-]/.test(m[2].slice(-1)) && !/[_-]/.test(s[i + m[0].length] || '')) { const v=m[1]+m[2].replace(/\/+[^/]*$/, ''); out += '<a href="' + url(v) + '">' + plain(v) + '</a>'; i += v.length; continue; }
     }
     if (c === '@' || /[A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]/.test(c)) {
       const m = /^[A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+/.exec(s.slice(i));
-      if (m && (i === 0 || /[\s(]/.test(s[i-1])) && !/[._-]/.test(s[i + m[0].length] || '')) { const v = m[0]; out += `<a href="mailto:${url(v)}">${plain(v)}</a>`; i += v.length; continue; }
+      if (m && (i === 0 || /[\s(]/.test(s[i-1])) && !/[_-]/.test(s[i + m[0].length] || '')) { const v = m[0]; out += `<a href="mailto:${url(v)}">${plain(v)}</a>`; i += v.length; continue; }
     }
     if (c === '*' || c === '_') {
       let n = 1; while (s[i + n] === c) n++; const run = n;
@@ -213,7 +213,7 @@ function parseBlocks(markdown, root = false) {
       const quote = []; let blanks = 0;
       while (i < lines.length) {
         const m = /^( {0,3})>(?: ?)(.*)$/.exec(lines[i]);
-        if (m) { quote.push(m[2]); i++; blanks = 0; continue; }
+        if (m) { if (blanks === 1) break; quote.push(m[2]); i++; blanks = 0; continue; }
         if (blank(lines[i])) { quote.push(''); i++; blanks++; if (blanks === 2) break; continue; }
         if (blanks || /^ {0,3}(?:#{1,6}(?:\s|$)|(?:`{3,}|~{3,}))/.test(lines[i])) break;
         if (isInterrupt(lines[i], false) && !listMatch(lines[i])) break;
@@ -287,7 +287,7 @@ function parseBlocks(markdown, root = false) {
       if (i < lines.length && hs[0] !== 'type7' && endRe && endRe.test(block.join('\n'))) { /* consumed through matching line */ }
       const nextBlock = lines.slice(i).find(x => !blank(x));
       const joinsParagraph = (hs[0] === 'blank' || hs[0] === 'type7') && nextBlock && !htmlStart(nextBlock) && !heading(nextBlock) && !fence(nextBlock) && !listMatch(nextBlock) && !/^ {0,3}>/.test(nextBlock) && !hr(nextBlock);
-      out.push(block.join('\n') + (hs[0] === 'comment' && endRe && endRe.test(block.join('\n')) || joinsParagraph ? '' : '\n')); continue;
+      out.push(block.join('\n') + (i >= lines.length && hs[0] === 'blank' ? '' : hs[0] === 'comment' && endRe && endRe.test(block.join('\n')) || joinsParagraph ? '' : '\n')); continue;
     }
     if (/^ {4,}\S/.test(line) || /^\t/.test(line)) {
       const code = []; while (i < lines.length && (/^(?: {4}|\t)/.test(lines[i]) || blank(lines[i]))) { code.push(blank(lines[i]) && !/^(?: {4}|\t)/.test(lines[i]) ? '' : lines[i].replace(/^(?: {4}|\t)/, '')); i++; }
@@ -310,7 +310,7 @@ function parseBlocks(markdown, root = false) {
     }
     const para = [line]; i++;
     while (i < lines.length && !blank(lines[i]) && !isInterrupt(lines[i], true) && !/^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[i])) para.push(lines[i++]);
-    if (i < lines.length && /^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[i])) { const n = /^ *-/.test(lines[i]) ? 2 : 1; out.push(`<h${n}>${inline(para.join('\n').trim())}</h${n}>\n`); i++; continue; }
+    if (i < lines.length && /^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[i]) && !/^ {4}/.test(lines[i])) { const n = /^ *-/.test(lines[i]) ? 2 : 1; out.push(`<h${n}>${inline(para.join('\n').trim())}</h${n}>\n`); i++; continue; }
     out.push('<p>' + inline(para.join('\n')) + '</p>\n');
   }
   return out.join('');
