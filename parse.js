@@ -199,7 +199,7 @@ function parseBlocks(markdown, root = false) {
     if (/^<![A-Z]/.test(s)) return ['decl'];
     if (/^<!\[cdata\[/i.test(t)) return ['cdata'];
     if (/^<\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|meta|nav|noframes|ol|optgroup|option|p|param|section|source|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)(?:\s|\/?>)/.test(tl)) return ['blank'];
-    if (/^<\/?[A-Za-z][A-Za-z0-9-]*(?:\s|\/?>)/.test(t) && (t.match(/</g)||[]).length <= 1) return ['type7'];
+    if ((t.startsWith('</') ? /^<\/[A-Za-z][A-Za-z0-9-]*[ \t]*>[ \t]*$/.test(t) : /^<[A-Za-z][A-Za-z0-9-]*(?:[ \t]+[A-Za-z_:][A-Za-z0-9_.:-]*(?:[ \t]*=[ \t]*(?:[^\s"'=<>`]+|'[^']*'|"[^"]*"))?)*[ \t]*\/?>[ \t]*$/.test(t)) && (t.match(/</g)||[]).length <= 1) return ['type7'];
     return null;
   };
   const isInterrupt = (s, paragraph = false) => {
