@@ -79,7 +79,7 @@ function inline(s, inLink = false) {
           const fallback = refs.get(key);
           if (fallback) { dest = fallback.href; title = fallback.title; after = close + 1; }
         }
-        if (!image && /\[[^\]]+\](?:\([^)]*\)|\[[^]]*\])/.test(labelText)) { out += '[' + inline(labelText, false) + ']'; i = close + 1; continue; }
+        if (!image && /\[[^\]]+\](?:\([^)]*\)|\[[^]]*\])/.test(labelText.replace(/!\[[^\]]*\](?:\([^)]*\)|\[[^\]]*\])/g, ''))) { out += '[' + inline(labelText, false) + ']'; i = close + 1; continue; }
         if (dest !== null && !(labelText.lastIndexOf('<') > labelText.lastIndexOf('>'))) { const body = image ? plain(labelText) : inline(labelText, false); const href = url(dest, true); let alt = image ? inline(labelText).replace(/<img\b[^>]*alt="([^"]*)"[^>]*>/g, '$1').replace(/<[^>]*>/g, '') : ''; out += image ? `<img src="${href}" alt="${alt}"${title ? ` title="${plain(title)}"` : ''}>` : `<a href="${href}"${title ? ` title="${plain(title)}"` : ''}>${body}</a>`; i = after; continue; }
       }
     }
