@@ -113,7 +113,7 @@ function inline(s, inLink = false) {
       const close = c === '*' ? right : right && !left;
       if (left) {
         let found = -1, k = i + n, nested = 0;
-        while (k < s.length) { if (s[k] === '\\') { k += 2; continue; } if (s[k] === c) { let m = 1; while (s[k + m] === c) m++; const x = k === 0 ? '\n' : s[k - 1], y = k + m === s.length ? '\n' : s[k + m]; const cl = !/[\s\u00a0]/.test(x) && (!unicodePunctuation.test(x) || /[\s\u00a0]/.test(y) || unicodePunctuation.test(y)); const op = !/[\s\u00a0]/.test(y) && (!unicodePunctuation.test(y) || /[\s\u00a0]/.test(x) || unicodePunctuation.test(x)); if (op && (c !== '_' || !cl || unicodePunctuation.test(x)) && (m === 1 || (c === '_' && m === 2))) nested++; if (cl && (c !== '_' || !/[\p{L}\p{N}]/u.test(y))) { if (run === 1 && c === '*' && m >= 2) { k += m; continue; } if (nested) nested--; else if (run >= 3 ? m >= 3 : true) { found = k; break; } } k += m; } else k++; }
+        while (k < s.length) { if (s[k] === '\\') { k += 2; continue; } if (s[k] === c) { let m = 1; while (s[k + m] === c) m++; const x = k === 0 ? '\n' : s[k - 1], y = k + m === s.length ? '\n' : s[k + m]; const cl = !/[\s\u00a0]/.test(x) && (!unicodePunctuation.test(x) || /[\s\u00a0]/.test(y) || unicodePunctuation.test(y)); const op = !/[\s\u00a0]/.test(y) && (!unicodePunctuation.test(y) || /[\s\u00a0]/.test(x) || unicodePunctuation.test(x)); if (op && (c !== '_' || !cl || (unicodePunctuation.test(x) && x !== ')')) && (m === 1 || (c === '_' && m === 2))) nested++; if (cl && (c !== '_' || !/[\p{L}\p{N}]/u.test(y))) { if (run === 1 && c === '*' && m >= 2) { k += m; continue; } if (nested) nested--; else if (run >= 3 ? m >= 3 : true) { found = k; break; } } k += m; } else k++; }
         if (found > i + n) { const end = found; const m = (() => { let q = 1; while (s[end + q] === c) q++; return q; })(); const use = Math.min(run, m) >= 3 ? 3 : Math.min(run, m) >= 2 ? 2 : 1; const shared = c === '*' && run === 2 && m >= 3; const inner = inline(s.slice(i + use, end) + (shared ? '*' : ''), inLink); out += use === 3 ? `<em><strong>${inner}</strong></em>` : use === 2 ? `<strong>${inner}</strong>` : `<em>${inner}</em>`; i = end + use + (shared ? 1 : 0); continue; }
       }
       out += c; i++; continue;
@@ -214,14 +214,14 @@ function parseBlocks(markdown, root = false) {
     if (h) { const rawText = h[3].replace(/[ \t]+#+[ \t]*$/, '').trim(); const text = /^#{1,6}$/.test(rawText) ? '' : rawText; out.push(`<h${h[2].length}>${inline(text)}</h${h[2].length}>\n`); i++; continue; }
     if (hr(line)) { out.push('<hr>\n'); i++; continue; }
     if (/^ {0,3}>/.test(line)) {
-      const quote = []; let blanks = 0;
+      const quote = []; let blanks = 0, quotedBlank = false;
       while (i < lines.length) {
         const m = /^( {0,3})>(?: ?)(.*)$/.exec(lines[i]);
-        if (m) { if (blanks === 1) break; quote.push(m[2]); i++; blanks = 0; continue; }
+        if (m) { if (blanks === 1) break; quote.push(m[2]); i++; blanks = 0; quotedBlank = !m[2]; continue; }
         if (blank(lines[i])) { quote.push(''); i++; blanks++; if (blanks === 2) break; continue; }
-        if (blanks || /^ {0,3}(?:#{1,6}(?:\s|$)|(?:`{3,}|~{3,}))/.test(lines[i])) break;
+        if (blanks || quotedBlank || /^ {0,3}(?:#{1,6}(?:\s|$)|(?:`{3,}|~{3,}))/.test(lines[i])) break;
         if (isInterrupt(lines[i], false) && !listMatch(lines[i])) break;
-        quote.push(lines[i++]);
+        quote.push(lines[i++]); quotedBlank = false;
       }
       out.push('<blockquote>\n' + parseBlocks(quote.join('\n')) + '</blockquote>\n'); continue;
     }
