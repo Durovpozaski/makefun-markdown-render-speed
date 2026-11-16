@@ -70,6 +70,11 @@ function inline(s, inLink = false) {
           const def = refs.get(label.replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, '$1').normalize('NFKC').toLowerCase().replace(/[\u00df]/g, 'ss').replace(/[ \t\n]+/g, ' '));
           if (def) { dest = def.href; title = def.title; }
         }
+        if (dest === null && s[close + 1] === '(') {
+          const key = labelText.replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, '$1').normalize('NFKC').toLowerCase().replace(/[\u00df]/g, 'ss').replace(/[ \t\n]+/g, ' ');
+          const fallback = refs.get(key);
+          if (fallback) { dest = fallback.href; title = fallback.title; after = close + 1; }
+        }
         if (!image && /\[[^\]]+\](?:\([^)]*\)|\[[^]]*\])/.test(labelText)) { out += '[' + inline(labelText, false) + ']'; i = close + 1; continue; }
         if (dest !== null && !(labelText.lastIndexOf('<') > labelText.lastIndexOf('>'))) { const body = image ? plain(labelText) : inline(labelText, false); const href = url(dest, true); let alt = image ? inline(labelText).replace(/<img\b[^>]*alt="([^"]*)"[^>]*>/g, '$1').replace(/<[^>]*>/g, '') : ''; out += image ? `<img src="${href}" alt="${alt}"${title ? ` title="${plain(title)}"` : ''}>` : `<a href="${href}"${title ? ` title="${plain(title)}"` : ''}>${body}</a>`; i = after; continue; }
       }
@@ -82,18 +87,18 @@ function inline(s, inLink = false) {
     if ((c === 'w' && /^www\.[A-Za-z0-9][^\s<>]*/i.test(s.slice(i))) || (/[A-Za-z]/.test(c) && /^(?:https?:\/\/|ftp:\/\/)/i.test(s.slice(i)))) {
       const m = /^(?:www\.[A-Za-z0-9]|https?:\/\/[A-Za-z0-9]|ftp:\/\/[A-Za-z0-9])[^\s<>]*/i.exec(s.slice(i));
       if (m) {
-        let v = m[0].replace(/[.,:;!?*_~]+$/, '');
+        let v = m[0].replace(/[.,:;!?*_~]+$/, '').replace(/&[A-Za-z][A-Za-z0-9]*;?$/, '');
         while (v.endsWith(')') && (v.match(/\)/g)||[]).length > (v.match(/\(/g)||[]).length) v = v.slice(0,-1);
         if (/^(?:www\.)?[A-Za-z0-9][^\s]*\.[A-Za-z]{2,}(?:\/|$)/i.test(v)) { const href = /^www\./i.test(v) ? 'http://' + v : v; out += `<a href="${url(href)}">${plain(v)}</a>`; i += v.length; continue; }
       }
     }
     if (/[A-Za-z]/.test(c) && /^(?:mailto:|xmpp:)[^\s<>]+/i.test(s.slice(i))) {
       const m = /^(mailto:|xmpp:)([A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+(?:\/[^\s<>]*)?)/i.exec(s.slice(i));
-      if (m && !/[._-]$/.test(m[2])) { const v=m[1]+m[2]; out += '<a href="' + url(v) + '">' + plain(v) + '</a>'; i += v.length; continue; }
+      if (m && !/[._-]/.test(m[2].slice(-1) + (s[i + m[0].length] || ''))) { const v=m[1]+m[2]; out += '<a href="' + url(v) + '">' + plain(v) + '</a>'; i += v.length; continue; }
     }
     if (c === '@' || /[A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]/.test(c)) {
       const m = /^[A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+/.exec(s.slice(i));
-      if (m && (i === 0 || /[\s(]/.test(s[i-1]))) { const v = m[0]; out += `<a href="mailto:${url(v)}">${plain(v)}</a>`; i += v.length; continue; }
+      if (m && (i === 0 || /[\s(]/.test(s[i-1])) && !/[._-]/.test(s[i + m[0].length] || '')) { const v = m[0]; out += `<a href="mailto:${url(v)}">${plain(v)}</a>`; i += v.length; continue; }
     }
     if (c === '*' || c === '_') {
       let n = 1; while (s[i + n] === c) n++; const run = n;
@@ -128,17 +133,24 @@ function collectDefinitions(lines) {
     if (fenceChar) { kept.push(line); if (new RegExp('^ {0,3}' + fenceChar + '{' + fenceSize + ',}[ \\t]*$').test(line)) fenceChar = ''; continue; }
     if (f) { fenceChar = f[2][0]; fenceSize = f[2].length; kept.push(line); continue; }
     const quote = /^( {0,3}> ?)(.*)$/.exec(line);
-    const content = quote ? quote[2] : line;
+    let content = quote ? quote[2] : line;
+    let definitionEnd = i;
+    if (/^ {0,3}\[[^\]]*$/.test(content)) {
+      let labelContent = content;
+      while (definitionEnd + 1 < lines.length && definitionEnd - i < 8 && !/\]:/.test(labelContent)) labelContent += '\n' + lines[++definitionEnd];
+      if (/\]:/.test(labelContent)) content = labelContent;
+    }
     if (kept.length && !blank(kept[kept.length - 1]) && !quote && !heading(kept[kept.length - 1]) && !fence(kept[kept.length - 1]) && !/^ {0,3}(?:>|[*+-]|\d+[.)])/.test(kept[kept.length - 1])) { kept.push(line); continue; }
     const m = /^ {0,3}\[((?:\\.|[^\]])+)\]:[ \t]*(.*)$/.exec(content);
     if (!m) { kept.push(line); continue; }
-    let tail = m[2], j = i + 1;
+    let tail = m[2], j = definitionEnd + 1;
     if (!tail && j < lines.length && !blank(lines[j])) tail = lines[j++].trim();
     let dest = '', title = '', valid = false;
     if (tail[0] === '<') { const e = tail.indexOf('>'); if (e >= 0 && (!tail[e + 1] || /\s/.test(tail[e + 1]))) { dest = tail.slice(1, e); tail = tail.slice(e + 1).trim(); valid = true; } }
     else { let k = 0, depth = 0; while (k < tail.length && !/\s/.test(tail[k])) { if (tail[k] === '\\') k++; else if (tail[k] === '(') depth++; else if (tail[k] === ')' && depth) depth--; k++; } dest = tail.slice(0, k); tail = tail.slice(k).trim(); }
     if (!valid) valid = !!dest;
-    if (!tail && j < lines.length && !blank(lines[j]) && /^[ \t]*["'(]/.test(lines[j])) tail = lines[j++].trim();
+    const titleFromNext = !tail && j < lines.length && !blank(lines[j]) && /^[ \t]*["'(]/.test(lines[j]);
+    if (titleFromNext) tail = lines[j++].trim();
     if (tail && (tail[0] === '"' || tail[0] === "'" || tail[0] === '(') && !tail.slice(1).includes(tail[0] === '(' ? ')' : tail[0])) {
       const qchar = tail[0] === '(' ? ')' : tail[0]; let pieces = [tail];
       while (j < lines.length && !blank(lines[j]) && !pieces.join('\n').slice(1).includes(qchar)) pieces.push(lines[j++]);
@@ -146,6 +158,7 @@ function collectDefinitions(lines) {
     }
     let titleRemainder = '';
     if (tail && (tail[0] === '"' || tail[0] === "'" || tail[0] === '(')) { const close = tail[0] === '(' ? ')' : tail[0]; const e = tail.lastIndexOf(close); if (e > 0) { title = tail.slice(1, e).replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, '$1'); titleRemainder = tail.slice(e + 1).trim(); } }
+    if (titleFromNext && titleRemainder) { j--; tail = ''; title = ''; titleRemainder = ''; }
     if (valid && (!tail || !/^['"(]/.test(tail) || (!!title && !titleRemainder))) { const key = m[1].replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, '$1').normalize('NFKC').toLowerCase().replace(/[\u00df]/g, 'ss').replace(/[ \t\n]+/g, ' '); if (!refs.has(key)) refs.set(key, { href: dest, title }); if (quote) kept.push(quote[1].trimEnd()); i = j - 1; }
     else kept.push(line);
   }
@@ -217,7 +230,7 @@ function parseBlocks(markdown, root = false) {
       let loose = false, items = [];
       while (i < lines.length) {
         const first = listMatch(lines[i]);
-        if (!first || first[1].length > baseIndent + 3 || (!!first[3] !== ordered) || (!ordered && first[2] !== marker) || (ordered && first[4] !== delim)) break;
+        if (hr(lines[i]) || !first || first[1].length > baseIndent + 3 || (!!first[3] !== ordered) || (!ordered && first[2] !== marker) || (ordered && first[4] !== delim)) break;
         let body = [first[6] || ''];
         const markerWidth = first[2].length;
         const spaces = first[5] ? first[5].length : 1;
@@ -276,12 +289,12 @@ function parseBlocks(markdown, root = false) {
       out.push(block.join('\n') + (hs[0] === 'comment' && endRe && endRe.test(block.join('\n')) || joinsParagraph ? '' : '\n')); continue;
     }
     if (/^ {4,}\S/.test(line) || /^\t/.test(line)) {
-      const code = []; while (i < lines.length && (/^(?: {4}|\t)/.test(lines[i]) || blank(lines[i]))) { code.push(lines[i].replace(/^(?: {4}|\t)/, '')); i++; }
+      const code = []; while (i < lines.length && (/^(?: {4}|\t)/.test(lines[i]) || blank(lines[i]))) { code.push(blank(lines[i]) && !/^(?: {4}|\t)/.test(lines[i]) ? '' : lines[i].replace(/^(?: {4}|\t)/, '')); i++; }
       while (code.length && blank(code[code.length - 1])) code.pop();
       out.push('<pre><code>' + esc(code.join('\n')) + '\n</code></pre>\n'); continue;
     }
     if (i + 1 < lines.length && line.includes('|') && /^ {0,3}\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)+\|?[ \t]*$/.test(lines[i + 1])) {
-      const split = (s) => { let a = [], cell = '', escp = false; for (let k = 0; k < s.length; k++) { const c = s[k]; if (c === '|' && !escp) { a.push(cell.trim()); cell = ''; escp = false; } else { cell += c; if (c === '\\') escp = !escp; else escp = false; } } a.push(cell.trim()); if (a[0] === '') a.shift(); if (a[a.length - 1] === '') a.pop(); return a; };
+      const split = (s) => { let a = [], cell = '', escp = false, ticks = 0, em = ''; for (let k = 0; k < s.length; k++) { const c = s[k]; if (c === '`') { let n = 1; while (s[k + n] === '`') n++; if (ticks === n) ticks = 0; else if (!ticks) ticks = n; cell += '`'.repeat(n); k += n - 1; continue; } if (!ticks && (c === '*' || c === '_')) { if (em === c) em = ''; else if (!em) em = c; } if (c === '|' && !escp && !ticks && !em) { a.push(cell.trim()); cell = ''; escp = false; } else { cell += c; if (c === '\\') escp = !escp; else escp = false; } } a.push(cell.trim()); if (a[0] === '') a.shift(); if (a[a.length - 1] === '') a.pop(); return a; };
       const heads = split(line), aligns = split(lines[i + 1]).map(x => x[0] === ':' && x.endsWith(':') ? 'center' : x[0] === ':' ? 'left' : x.endsWith(':') ? 'right' : '');
       const cellHtml = (v) => inline(v.replace(/\\\|/g, '|').replace(/\\\\/g, '\\').trim());
       out.push('<table>\n<thead>\n<tr>\n'); for (let k = 0; k < aligns.length; k++) out.push(`<th${aligns[k] ? ` align="${aligns[k]}"` : ''}>${cellHtml(heads[k] || '')}</th>\n`); out.push('</tr>\n</thead>\n');
