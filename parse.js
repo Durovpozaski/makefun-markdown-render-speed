@@ -47,8 +47,10 @@ function inline(s, inLink = false) {
         const v = s.slice(i + 1, end), mail = /^[A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/.test(v);
         if (/^[A-Za-z][A-Za-z0-9.+-]{1,31}:[^ <>]*$/.test(v)) { out += `<a href="${url(v)}">${plain(v)}</a>`; i = end + 1; continue; }
         if (mail) { out += `<a href="mailto:${url(v)}">${plain(v)}</a>`; i = end + 1; continue; }
-    if (/^\/?(?:title|textarea|style|xmp|iframe|noembed|noframes|script|plaintext)(?:\s|\/?>)/i.test(v)) { out += '&lt;' + s.slice(i + 1, end) + '&gt;'; i = end + 1; continue; }
-        if (!v.includes('\\') && (/^\/?[A-Za-z][A-Za-z0-9-]*(?:\s|\/?>|$)/.test(v) || /^!--/.test(v) || /^\?[\s\S]*\?$/.test(v))) { out += s.slice(i, end + 1); i = end + 1; continue; }
+        const tag = /^\/?[A-Za-z][A-Za-z0-9-]*(?:[ \t\n]+(?:[A-Za-z_:][A-Za-z0-9_.:-]*(?:[ \t\n]*=[ \t\n]*(?:[^\s\"'=<>`]+|'[^']*'|\"[^\"]*\"))?)?)*[ \t\n]*\/?$/.test(v);
+        const comment = /^!--[\s\S]*--$/.test(v), pi = /^\?[\s\S]*\?$/.test(v);
+        const decl = /^![A-Z][A-Z0-9-]*(?:[ \t\n]+[\s\S]*)?$/.test(v), cdata = /^!\[CDATA\[[\s\S]*\]\]$/.test(v);
+        if (tag || comment || pi || decl || cdata) { out += s.slice(i, end + 1); i = end + 1; continue; }
       }
     }
     if ((!inLink && c === '[') || (c === '!' && s[i + 1] === '[')) {
