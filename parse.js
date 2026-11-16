@@ -112,9 +112,17 @@ function inline(s, inLink = false) {
       if (c === '_' && /[\p{L}\p{N}]/u.test(a) && /[\p{L}\p{N}]/u.test(b)) { out += c.repeat(n); i += n; continue; }
       const close = c === '*' ? right : right && !left;
       if (left) {
-        let found = -1, k = i + n, nested = 0;
-        while (k < s.length) { if (s[k] === '\\') { k += 2; continue; } if (s[k] === c) { let m = 1; while (s[k + m] === c) m++; const x = k === 0 ? '\n' : s[k - 1], y = k + m === s.length ? '\n' : s[k + m]; const cl = !/[\s\u00a0]/.test(x) && (!unicodePunctuation.test(x) || /[\s\u00a0]/.test(y) || unicodePunctuation.test(y)); const op = !/[\s\u00a0]/.test(y) && (!unicodePunctuation.test(y) || /[\s\u00a0]/.test(x) || unicodePunctuation.test(x)); if (op && (c !== '_' || !cl || (unicodePunctuation.test(x) && x !== ')')) && (m === 1 || (c === '_' && m === 2))) nested++; if (cl && (c !== '_' || !/[\p{L}\p{N}]/u.test(y))) { if (run === 1 && c === '*' && m >= 2) { k += m; continue; } if (nested) nested--; else if (run >= 3 ? m >= 3 : true) { found = k; break; } } k += m; } else k++; }
+        let found = -1, k = i + n, nested = 0, skipped = -1, skippedM = 0, skippedNested = 0;
+        while (k < s.length) { if (s[k] === '\\') { k += 2; continue; } if (s[k] === c) { let m = 1; while (s[k + m] === c) m++; const x = k === 0 ? '\n' : s[k - 1], y = k + m === s.length ? '\n' : s[k + m]; const cl = !/[\s\u00a0]/.test(x) && (!unicodePunctuation.test(x) || /[\s\u00a0]/.test(y) || unicodePunctuation.test(y)); const op = !/[\s\u00a0]/.test(y) && (!unicodePunctuation.test(y) || /[\s\u00a0]/.test(x) || unicodePunctuation.test(x)); if (op && (c !== '_' || !cl || (unicodePunctuation.test(x) && x !== ')')) && (m === 1 || (c === '_' && m === 2))) nested++; if (cl && (c !== '_' || !/[\p{L}\p{N}]/u.test(y))) { if (run === 1 && c === '*' && m >= 2) { if (skipped < 0) { skipped = k; skippedM = m; skippedNested = nested; } k += m; continue; } if (nested) nested--; else if (run >= 3 ? m >= 3 : true) { found = k; break; } } k += m; } else k++; }
         if (found > i + n) { const end = found; const m = (() => { let q = 1; while (s[end + q] === c) q++; return q; })(); const use = Math.min(run, m) >= 3 ? 3 : Math.min(run, m) >= 2 ? 2 : 1; const shared = c === '*' && run === 2 && m >= 3; const inner = inline(s.slice(i + use, end) + (shared ? '*' : ''), inLink); out += use === 3 ? `<em><strong>${inner}</strong></em>` : use === 2 ? `<strong>${inner}</strong>` : `<em>${inner}</em>`; i = end + use + (shared ? 1 : 0); continue; }
+        if (found < 0 && skipped > 0 && skippedNested <= 1) {
+          let lr = null; for (let p = i + n; p < skipped;) { if (s[p] === '\\') { p += 2; continue; } if (s[p] === c) { let q = p; while (q < skipped && s[q] === c) q++; lr = { s: p, l: q - p }; p = q; } else p++; }
+          let takeEnd = false, takeFront = false;
+          if (!lr) takeFront = true;
+          else { const pa = s[lr.s - 1], pb = s[lr.s + lr.l]; const lleft = !/[\s\u00a0]/.test(pb) && (!unicodePunctuation.test(pb) || /[\s\u00a0]/.test(pa) || unicodePunctuation.test(pa)); if (!lleft) takeFront = true; else if (lr.l === 1 || skippedM >= 3) takeEnd = true; }
+          if (takeEnd) { const inner = inline(s.slice(i + 1, skipped + skippedM - 1), inLink); out += `<em>${inner}</em>`; i = skipped + skippedM; continue; }
+          if (takeFront) { const inner = inline(s.slice(i + 1, skipped), inLink); out += `<em>${inner}</em>`; i = skipped + 1; continue; }
+        }
       }
       if (!left) { out += c.repeat(n); i += n; continue; }
       out += c; i++; continue;
