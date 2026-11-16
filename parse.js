@@ -40,6 +40,7 @@ function inline(s, inLink = false) {
       const mark = '`'.repeat(n); let end = i + n, found = -1;
       while ((end = s.indexOf(mark, end)) >= 0) { let run = end + n; while (s[run] === '`') run++; if (run - end === n) { found = end; break; } end = run; }
       if (found >= 0) { let value = s.slice(i + n, found).replace(/\n/g, ' '); if (/^ .* $/.test(value) && /[^ ]/.test(value)) value = value.slice(1, -1); out += '<code>' + esc(value) + '</code>'; i = found + n; continue; }
+      out += mark; i += n; continue;
     }
     if (c === '<') {
       const end = s.indexOf('>', i + 1);
@@ -109,7 +110,7 @@ function inline(s, inLink = false) {
       out += c; i++; continue;
     }
     if (c === '~') { let run = 1; while (s[i + run] === '~') run++; if (run <= 2) { const mark = '~'.repeat(run); let e = i + run; while ((e = s.indexOf(mark, e)) >= 0) { let tail = e + run; while (s[tail] === '~') tail++; if (tail - e === run && e > i + run && !/[\s\u00a0]/.test(s[e - 1]) && !/[\s\u00a0]/.test(s[i + run])) { out += '<del>' + inline(s.slice(i + run, e), inLink) + '</del>'; i = tail; break; } e = tail; } if (i >= s.length || s[i] !== '~') continue; } }
-    out += c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '"' ? '&quot;' : c; i++;
+    out += c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '"' ? '&quot;' : c === "'" ? '&#39;' : c; i++;
   }
   return out;
 }
@@ -161,6 +162,7 @@ function parseBlocks(markdown, root = false) {
   const htmlStart = (s) => {
     if (!/^ {0,3}</.test(s)) return null;
     const t = s.slice(s.indexOf('<')); const tl = t.toLowerCase();
+    if ((t.match(/"/g) || []).length % 2 || (t.match(/'/g) || []).length % 2) return null;
     if (/^<(script|pre|style|textarea|title|xmp|iframe|noembed|noframes|plaintext)(?:\s|>|\/|$)/i.test(t)) return ['tag', RegExp.$1];
     if (/^<!--/.test(t)) return ['comment'];
     if (/^<\?/.test(t)) return ['pi'];
@@ -183,15 +185,15 @@ function parseBlocks(markdown, root = false) {
       const body = []; const ch = f[2][0], size = f[2].length; i++;
       while (i < lines.length && !new RegExp('^ {0,3}' + (ch === '`' ? '`' : '~') + '{' + size + ',}[ \\t]*$').test(lines[i])) body.push(lines[i++]);
       if (i < lines.length) i++;
-      while (body.length && blank(body[body.length - 1])) body.pop();
+      while (body.length && body[body.length - 1] === '') body.pop();
       const fenceIndent = f[1].length;
       for (let k = 0; k < body.length; k++) body[k] = body[k].replace(new RegExp('^ {0,' + fenceIndent + '}'), '');
       const info = f[3].trim().split(/[ \t]/)[0].replace(/\\(.)/g, (m, c) => punctuation.test(c) ? c : m);
       const code = body.join('\n');
-      out.push('<pre><code' + (info ? ` class="language-${esc(info)}"` : '') + '>' + esc(code) + (code ? '\n' : '') + '</code></pre>\n'); continue;
+      out.push('<pre><code' + (info ? ` class="language-${info.replace(/&(?!#(?:[xX][\da-fA-F]{1,6}|\d{1,7});|[A-Za-z][A-Za-z\d]{1,31};)/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')}"` : '') + '>' + esc(code) + (code ? '\n' : '') + '</code></pre>\n'); continue;
     }
     const h = heading(line);
-    if (h) { const text = h[3].replace(/[ \t]+#+[ \t]*$/, '').trim(); out.push(`<h${h[2].length}>${inline(text)}</h${h[2].length}>\n`); i++; continue; }
+    if (h) { const rawText = h[3].replace(/[ \t]+#+[ \t]*$/, '').trim(); const text = /^#{1,6}$/.test(rawText) ? '' : rawText; out.push(`<h${h[2].length}>${inline(text)}</h${h[2].length}>\n`); i++; continue; }
     if (hr(line)) { out.push('<hr>\n'); i++; continue; }
     if (/^ {0,3}>/.test(line)) {
       const quote = []; let blanks = 0;
@@ -230,6 +232,7 @@ function parseBlocks(markdown, root = false) {
             if (j < lines.length && indent(lines[j]) >= contentIndent) { if (body.length && !blank(body[body.length - 1])) loose = true; body.push(''); i++; continue; }
             i = j; break;
           }
+          if (hr(lines[i])) break;
           const next = listMatch(lines[i]);
           if (next && next[1].length <= baseIndent) break;
           const leading = indent(lines[i]);
@@ -250,7 +253,7 @@ function parseBlocks(markdown, root = false) {
         if (!item._loose && !loose) content = content.replace(/^<p>([\s\S]*?)<\/p>\n/, '$1');
         const checkbox = task ? `<input${task[1] === ' ' ? '' : ' checked=""'} disabled="" type="checkbox"> ` : '';
         const blockContent = content.replace(/\n$/, '');
-        const closesBlock = /<\/(?:blockquote|ul|ol|pre|table|div|h[1-6])>$/i.test(blockContent);
+        const closesBlock = /(?:<\/(?:blockquote|ul|ol|pre|table|div|h[1-6])>|<hr>)$/i.test(blockContent);
         out.push('<li>' + checkbox + blockContent + (((item._loose || loose) || closesBlock) && blockContent ? '\n' : '') + '</li>\n');
       }
       out.push(`</${tag}>\n`); continue;
@@ -272,7 +275,7 @@ function parseBlocks(markdown, root = false) {
       const joinsParagraph = (hs[0] === 'blank' || hs[0] === 'type7') && nextBlock && !htmlStart(nextBlock) && !heading(nextBlock) && !fence(nextBlock) && !listMatch(nextBlock) && !/^ {0,3}>/.test(nextBlock) && !hr(nextBlock);
       out.push(block.join('\n') + (hs[0] === 'comment' && endRe && endRe.test(block.join('\n')) || joinsParagraph ? '' : '\n')); continue;
     }
-    if (/^ {4}\S/.test(line) || /^\t/.test(line)) {
+    if (/^ {4,}\S/.test(line) || /^\t/.test(line)) {
       const code = []; while (i < lines.length && (/^(?: {4}|\t)/.test(lines[i]) || blank(lines[i]))) { code.push(lines[i].replace(/^(?: {4}|\t)/, '')); i++; }
       while (code.length && blank(code[code.length - 1])) code.pop();
       out.push('<pre><code>' + esc(code.join('\n')) + '\n</code></pre>\n'); continue;
