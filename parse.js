@@ -58,7 +58,11 @@ function inline(s, inLink = false) {
       const image = c === '!'; const start = i + (image ? 2 : 1); let depth = 1, close = start;
       for (; close < s.length; close++) { if (s[close] === '\\') { close++; continue; } if (s[close] === '[') depth++; else if (s[close] === ']' && --depth === 0) break; }
       if (close < s.length) {
-        const labelText = s.slice(start, close); let j = close + 1, dest = null, title = '', after = j;
+        const labelText = s.slice(start, close);
+        const backticks = (labelText.match(/`+/g) || []).map(x => x.length);
+        const codeAfter = /`/.test(s.slice(close + 1));
+        if (backticks.length && (backticks.length % 2 || backticks.some(n => !backticks.includes(n))) && codeAfter) { out += image ? '![' : '['; i += image ? 2 : 1; continue; }
+        let j = close + 1, dest = null, title = '', after = j;
         if (s[j] === '(') {
           j++; while (s[j] === ' ' || s[j] === '\n' || s[j] === '\t') j++;
         if (s[j] === '<') { const z = s.indexOf('>', j + 1); if (z >= 0 && !/[\n\\]/.test(s.slice(j + 1, z))) { dest = s.slice(j + 1, z); j = z + 1; } }
@@ -84,7 +88,7 @@ function inline(s, inLink = false) {
         if (m) { out += m[0][1] === '#' ? esc(decodeEntity(m[0])) : m[0]; i += m[0].length; continue; }
       out += '&amp;'; i++; continue;
     }
-    if ((c === 'w' && /^www\.[A-Za-z0-9][^\s<>]*/i.test(s.slice(i))) || (/[A-Za-z]/.test(c) && /^(?:https?:\/\/|ftp:\/\/)/i.test(s.slice(i)))) {
+    if ((c === 'w' && /^www\.[A-Za-z0-9][^\s<>]*/i.test(s.slice(i))) || ((c === 'h' || c === 'H' || c === 'f' || c === 'F') && /^(?:https?:\/\/|ftp:\/\/)/i.test(s.slice(i)))) {
       const m = /^(?:www\.[A-Za-z0-9]|https?:\/\/[A-Za-z0-9]|ftp:\/\/[A-Za-z0-9])[^\s<>]*/i.exec(s.slice(i));
       if (m) {
         let v = m[0].replace(/[.,:;!?*_~]+$/, '').replace(/&[A-Za-z][A-Za-z0-9]*;?$/, '');
@@ -92,13 +96,13 @@ function inline(s, inLink = false) {
         if (/^(?:www\.)?[A-Za-z0-9][^\s]*\.[A-Za-z]{2,}(?:\/|$)/i.test(v)) { const href = /^www\./i.test(v) ? 'http://' + v : v; out += `<a href="${url(href)}">${plain(v)}</a>`; i += v.length; continue; }
       }
     }
-    if (/[A-Za-z]/.test(c) && /^(?:mailto:|xmpp:)[^\s<>]+/i.test(s.slice(i))) {
+    if ((c === 'm' || c === 'M' || c === 'x' || c === 'X') && /^(?:mailto:|xmpp:)[^\s<>]+/i.test(s.slice(i))) {
       const m = /^(mailto:|xmpp:)([A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+(?:\/[^\s<>]*)?)/i.exec(s.slice(i));
       if (m && !/[._-]/.test(m[2].slice(-1)) && !/[_-]/.test(s[i + m[0].length] || '')) { const v=m[1]+m[2].replace(/\/+[^/]*$/, ''); out += '<a href="' + url(v) + '">' + plain(v) + '</a>'; i += v.length; continue; }
     }
-    if (c === '@' || /[A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]/.test(c)) {
+    if ((i === 0 || /[\s(]/.test(s[i-1])) && (c === '@' || /[A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]/.test(c))) {
       const m = /^[A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+/.exec(s.slice(i));
-      if (m && (i === 0 || /[\s(]/.test(s[i-1])) && !/[_-]/.test(s[i + m[0].length] || '')) { const v = m[0]; out += `<a href="mailto:${url(v)}">${plain(v)}</a>`; i += v.length; continue; }
+      if (m && !/[_-]/.test(s[i + m[0].length] || '')) { const v = m[0]; out += `<a href="mailto:${url(v)}">${plain(v)}</a>`; i += v.length; continue; }
     }
     if (c === '*' || c === '_') {
       let n = 1; while (s[i + n] === c) n++; const run = n;
