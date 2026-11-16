@@ -97,8 +97,8 @@ function inline(s, inLink = false) {
       }
     }
     if ((c === 'm' || c === 'M' || c === 'x' || c === 'X') && /^(?:mailto:|xmpp:)[^\s<>]+/i.test(s.slice(i))) {
-      const m = /^(mailto:|xmpp:)([A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+(?:\/[^\s<>]*)?)/i.exec(s.slice(i));
-      if (m && !/[._-]/.test(m[2].slice(-1)) && !/[_-]/.test(s[i + m[0].length] || '')) { const v=m[1]+m[2].replace(/\/+[^/]*$/, ''); out += '<a href="' + url(v) + '">' + plain(v) + '</a>'; i += v.length; continue; }
+      const m = /^(mailto:|xmpp:)([A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+(?:\/[^\/\s<>]*)?)/i.exec(s.slice(i));
+      if (m && !/[._-]/.test(m[2].slice(-1)) && !/[_-]/.test(s[i + m[0].length] || '')) { const v = /^mailto:/i.test(m[1]) ? m[1] + m[2].replace(/\/+[^/]*$/, '') : m[1] + m[2]; out += '<a href="' + url(v) + '">' + plain(v) + '</a>'; i += v.length; continue; }
     }
     if ((i === 0 || /[\s(]/.test(s[i-1])) && (c === '@' || /[A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]/.test(c))) {
       const m = /^[A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+/.exec(s.slice(i));
@@ -154,7 +154,7 @@ function collectDefinitions(lines) {
       if (/\]:/.test(labelContent)) content = labelContent;
     }
     if (kept.length && !blank(kept[kept.length - 1]) && !quote && !heading(kept[kept.length - 1]) && !fence(kept[kept.length - 1]) && !/^ {0,3}(?:>|[*+-]|\d+[.)])/.test(kept[kept.length - 1])) { kept.push(line); continue; }
-    const m = /^ {0,3}\[((?:\\.|[^\]])+)\]:[ \t]*(.*)$/.exec(content);
+    const m = /^ {0,3}\[((?:\\.|[^\]\[])+)\]:[ \t]*(.*)$/.exec(content);
     if (!m) { kept.push(line); continue; }
     let tail = m[2], j = definitionEnd + 1;
     if (!tail && j < lines.length && !blank(lines[j])) tail = lines[j++].trim();
@@ -203,7 +203,8 @@ function parseBlocks(markdown, root = false) {
     return null;
   };
   const isInterrupt = (s, paragraph = false) => {
-    if (heading(s) || fence(s) || /^ {0,3}>/.test(s) || hr(s) || htmlStart(s)) return true;
+    const hs = htmlStart(s);
+    if (heading(s) || fence(s) || /^ {0,3}>/.test(s) || hr(s) || (hs && (!paragraph || hs[0] !== 'type7'))) return true;
     const lm = listMatch(s);
     return !!lm && (!paragraph || (!!lm[6] && !blank(lm[6]) && (!lm[3] || Number(lm[3]) === 1))); 
   };
