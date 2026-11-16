@@ -172,7 +172,7 @@ function collectDefinitions(lines) {
     let titleRemainder = '';
     if (tail && (tail[0] === '"' || tail[0] === "'" || tail[0] === '(')) { const close = tail[0] === '(' ? ')' : tail[0]; const e = tail.lastIndexOf(close); if (e > 0) { title = tail.slice(1, e).replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, '$1'); titleRemainder = tail.slice(e + 1).trim(); } }
     if (titleFromNext && titleRemainder) { j--; tail = ''; title = ''; titleRemainder = ''; }
-    if (valid && (!tail || !/^['"(]/.test(tail) || (!!title && !titleRemainder))) { const key = m[1].replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, '$1').normalize('NFKC').toLowerCase().replace(/[\u00df]/g, 'ss').replace(/[ \t\n]+/g, ' '); if (!refs.has(key)) refs.set(key, { href: dest, title }); if (quote) kept.push(quote[1].trimEnd()); i = j - 1; }
+    if (valid && m[1].replace(/\\(.)/g, '$1').trim() && (!tail || !/^['"(]/.test(tail) || (!!title && !titleRemainder))) { const key = m[1].replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, '$1').normalize('NFKC').toLowerCase().replace(/[\u00df]/g, 'ss').replace(/[ \t\n]+/g, ' '); if (!refs.has(key)) refs.set(key, { href: dest, title }); if (quote) kept.push(quote[1].trimEnd()); i = j - 1; }
     else kept.push(line);
   }
   return kept;
