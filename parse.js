@@ -270,7 +270,7 @@ function parseBlocks(markdown, root = false) {
           const leading = indent(lines[i]);
           if (leading >= contentIndent) { body.push(lines[i].slice(Math.min(contentIndent, leading))); i++; continue; }
           if (isInterrupt(lines[i], false)) break;
-          body.push(lines[i++]);
+          body.push(lines[i].slice(Math.min(contentIndent, indent(lines[i])))); i++;
         }
         items.push(body);
       }
