@@ -292,7 +292,8 @@ function parseBlocks(markdown, root = false) {
       if (i < lines.length && hs[0] !== 'type7' && endRe && endRe.test(block.join('\n'))) { /* consumed through matching line */ }
       const nextBlock = lines.slice(i).find(x => !blank(x));
       const joinsParagraph = (hs[0] === 'blank' || hs[0] === 'type7') && nextBlock && !htmlStart(nextBlock) && !heading(nextBlock) && !fence(nextBlock) && !listMatch(nextBlock) && !/^ {0,3}>/.test(nextBlock) && !hr(nextBlock);
-      out.push(block.join('\n') + (block[block.length - 1] === '' || (i >= lines.length && hs[0] === 'blank') ? '' : hs[0] === 'comment' && endRe && endRe.test(block.join('\n')) || joinsParagraph ? '' : '\n')); continue;
+      const noNL = block[block.length - 1] === '' || i >= lines.length || ((hs[0] === 'blank' || hs[0] === 'type7' || hs[0] === 'decl') && i < lines.length && blank(lines[i]) && i + 1 < lines.length) || ((hs[0] === 'tag' || hs[0] === 'comment' || hs[0] === 'pi' || hs[0] === 'cdata') && i < lines.length && lines[i] === '' && i + 1 < lines.length) || joinsParagraph;
+      out.push(block.join('\n') + (noNL ? '' : '\n')); continue;
     }
     if (/^ {4,}\S/.test(line) || /^\t/.test(line)) {
       const code = []; while (i < lines.length && (/^(?: {4}|\t)/.test(lines[i]) || blank(lines[i]))) { code.push(blank(lines[i]) && !/^(?: {4}|\t)/.test(lines[i]) ? '' : lines[i].replace(/^(?: {4}|\t)/, '')); i++; }
